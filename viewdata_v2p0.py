@@ -7,8 +7,9 @@ from configobj import ConfigObj
 import matplotlib
 matplotlib.use('WXAgg')
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas, \
-        NavigationToolbar2WxAgg as NavigationToolbar
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
+from matplotlib.backends.backend_wx import NavigationToolbar2Wx
+
 import numpy
 import copy
 
@@ -16,16 +17,14 @@ import qrange
 
 from fitlibrary import *
 
-latest_data_sets_dir = './latest_data_sets.INI'
+latest_data_sets_dir = '/home/xinxing/Programs/viewdata2.0/latest_data_sets.INI'
 data_dir = '/home/xinxing/Programs/data'
-setting_dir = './setting.INI'
+setting_dir = '/home/xinxing/Programs/viewdata2.0/setting.INI'
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
         wx.Frame.__init__(self, parent, title=title, size = (1300, 600))
-        
         self.saved_settings = ConfigObj(setting_dir)
-        
         data_dir = self.saved_settings['DIR']['data_dir']
 #        del self.saved_settings['DIR']
 
@@ -273,11 +272,14 @@ class PlotPanel(wx.Panel):
         self.dpi = 100
         self.fig = Figure((1.0, 1.0), dpi = self.dpi)
         self.canvas = FigCanvas(self, -1, self.fig)
+        toolbar = NavigationToolbar2Wx( self.canvas )
+
 #        self.axes = self.fig.add_subplot(2,1,1)
 #        self.axes = self.fig.add_subplot(2,1,2)
-        self.hbox = wx.BoxSizer(wx.HORIZONTAL)
-        self.hbox.Add(self.canvas, 1, wx.EXPAND | wx.ALL) #wx.LEFT | wx.TOP | wx.BOTTOM | wx.GROW
-        self.SetSizerAndFit(self.hbox)
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
+        self.vbox.Add(self.canvas, 1, wx.EXPAND | wx.ALL) #wx.LEFT | wx.TOP | wx.BOTTOM | wx.GROW
+        self.vbox.Add(toolbar, 0, wx.EXPAND)
+        self.SetSizerAndFit(self.vbox)
 #        self.hbox.Fit(self)
 #        self.axes = self.fig.add_subplot(2,1,2)
 
