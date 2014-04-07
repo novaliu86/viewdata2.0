@@ -218,10 +218,14 @@ class MainWindow(wx.Frame):
                             if data_set.setup_dict['plotB'] == 'True':
                                 if data_set.setup_dict['fitB'] == 'True':
                                     data_set.get_fit()
-                                    
                                     axes.plot(data_set.fitX, data_set.fitY)
                                     self.controlpanel.fit.fit_result.ChangeValue(data_set.setup_dict['fit_result'])
                                     legend_tuple = legend_tuple + (Legend+'_fit',)
+
+                                else:
+                                    data_set.get_plot()
+                                    axes.plot(data_set.plotX, data_set.plotY)
+                                    legend_tuple = legend_tuple + (Legend+'_plot',)
 
                             if l == 0:
                                 Xl = data_set.setup_dict['Xl'] if data_set.setup_dict['Xl'] != '' else data_set.setup_dict['X']
@@ -864,6 +868,14 @@ class data_setup():
         year2 = year[2:4]
         return data_dir + '/' + year + '/' + year2+month + '/' + year2+month+day + '/' 
 
+    def get_plot(self):
+        func_name = self.setup_dict['func']
+        function = fitdict[func_name].function
+        p = [ float(f) for f in self.setup_dict['para_list']]
+        data = numpy.array(self.data)
+        print p, function
+        self.plotX, self.plotY = plot_function(p, data[:,0], function)
+    
     def get_fit(self):
         func_name = self.setup_dict['func']
         function = fitdict[func_name].function

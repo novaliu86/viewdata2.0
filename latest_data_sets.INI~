@@ -22,10 +22,10 @@ statsB = False
 gridB = False
 xticksB = True
 yticksB = True
-fitB = False
+fitB = True
 plotB = True
-func = ExpSine
-para_list = 0.05, 0.4, 0.5, 0, 0.55, 0.5
+func = Parabola
+para_list = 0.01, 8180, 0.5, 0, 0
 fit_result = """para			error
 4.60e-12	4.00e-12
 8.18e+03	1.14e+00

@@ -87,7 +87,7 @@ fitdict['ExpSine'] = expsine
 # p4 = offset
 # p5 = slope
 expsineplusline = fits( lambda x,p: p[0]*numpy.sin(p[1]*x*numpy.pi*2-p[2])*numpy.exp(-x*p[3])+p[4]+p[5]*x )
-expsine.fitexpr = 'a[0]*sin( a[1]*x*2*pi-a[2] )*exp(-x*a[3]) + a[4] + a[5]*x'
+expsineplusline.fitexpr = 'a[0]*sin( a[1]*x*2*pi-a[2] )*exp(-x*a[3]) + a[4] + a[5]*x'
 fitdict['ExpSinePlusLine'] = expsineplusline
 
 #---------------------- TEMPERATURE
