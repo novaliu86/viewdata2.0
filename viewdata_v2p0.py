@@ -11,11 +11,13 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
 from matplotlib.backends.backend_wx import NavigationToolbar2Wx
 
 import numpy
+from scipy import stats
 import copy
 
 import qrange
 
 from fitlibrary import *
+import statdat
 
 latest_data_sets_dir = './latest_data_sets.INI'
 data_dir = '/home/xinxing/Programs/data'
@@ -211,7 +213,15 @@ class MainWindow(wx.Frame):
 
                             stats = (data_set.setup_dict['statsB'] == 'True') if data_set.setup_dict.has_key('statsB') else False
                             
-                            axes.plot(data_set.data[:,0], data_set.data[:,1], fmt, mec = ec, mfc = color, ms = ms, mew =mew )
+                            if data_set.sdata != None and stats:
+                                sdata = data_set.sdata
+                                sdata = sdata[sdata[:,0].argsort()]
+                                axes.plot(sdata[:,0], sdata[:,1], '-', color = color)
+                                axes.fill_between(sdata[:,0], sdata[:,1] + sdata[:,2], sdata[:,1] - sdata[:,2], facecolor = color, alpha = 0.3)
+                                axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,3], sdata[:,1] -sdata[:,3], facecolor = color, alpha = 0.3)
+                                axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,4]/2., sdata[:,1]-sdata[:,4]/2., facecolor = color, alpha = 0.1)
+                            else:
+                                axes.plot(data_set.data[:,0], data_set.data[:,1], fmt, mec = ec, mfc = color, ms = ms, mew =mew )
                             
                             legend_tuple = legend_tuple + (Legend,)
 
@@ -862,7 +872,30 @@ class data_setup():
             shots = ",".join(shots)
         keys = " ".join([self.setup_dict['X'], self.setup_dict['Y']])
         self.data, self.errmsg, self.raw_data = qrange.qrange(directory, shots, keys)
-    
+        s = ''
+        for i in range(self.data.shape[1]):
+            col = self.data[:,i]
+            s00 = numpy.mean(col)
+            s01 = stats.sem(col)
+            s02 = numpy.std(col)
+            s03 = numpy.max(col) - numpy.min(col)
+            s = s + "Mean = %10.6f\n" % s00
+            s = s + "Std. deviation  = %10.6f\n" % s02
+            s = s + "Std. Error of the mean = %10.6f\n" % s01
+            s = s + "Pk-Pk = %10.6f\n" % s03
+            s = s+ '\n'
+        self.raw_data = s + self.raw_data
+
+        self.sdata = None
+        if self.setup_dict['X'] == "SEQ:shot":
+            s = [ numpy.mean(self.data[:,1]), numpy.std(self.data[:,1]), stats.sem(self.data[:,1]),numpy.max(self.data[:,1]) - numpy.min(self.data[:,1]) ]
+            a = []
+            for val in s:
+                a.append( [val for i in range(self.data[:,1].size)])
+            self.sdata = numpy.c_[self.data[:,0], numpy.transpose(numpy.array(a))]
+        else:
+            self.sdata = statdat.statdat(self.data, 0, 1)
+
     def get_dir(self):
         year, month, day = self.setup_dict['date'].split('/')
         year2 = year[2:4]
@@ -873,7 +906,6 @@ class data_setup():
         function = fitdict[func_name].function
         p = [ float(f) for f in self.setup_dict['para_list']]
         data = numpy.array(self.data)
-        print p, function
         self.plotX, self.plotY = plot_function(p, data[:,0], function)
     
     def get_fit(self):
