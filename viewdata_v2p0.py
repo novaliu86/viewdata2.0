@@ -17,9 +17,9 @@ import qrange
 
 from fitlibrary import *
 
-latest_data_sets_dir = '/home/xinxing/Programs/viewdata2.0/latest_data_sets.INI'
+latest_data_sets_dir = './latest_data_sets.INI'
 data_dir = '/home/xinxing/Programs/data'
-setting_dir = '/home/xinxing/Programs/viewdata2.0/setting.INI'
+setting_dir = './setting.INI'
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
@@ -381,6 +381,7 @@ class ControlPanel(wx.Panel):
         self.Bind(wx.EVT_TEXT, self.evt_para_list_2_change, self.fit.para_list[2])
         self.Bind(wx.EVT_TEXT, self.evt_para_list_3_change, self.fit.para_list[3])
         self.Bind(wx.EVT_TEXT, self.evt_para_list_4_change, self.fit.para_list[4])
+        self.Bind(wx.EVT_TEXT, self.evt_para_list_5_change, self.fit.para_list[5])
         
         #Layout of the control panel
         hSizer1 = wx.BoxSizer(wx.HORIZONTAL)
@@ -674,12 +675,14 @@ class ControlPanel(wx.Panel):
             self.fit.para_list[2].ChangeValue(setup_dict['para_list'][2])
             self.fit.para_list[3].ChangeValue(setup_dict['para_list'][3])
             self.fit.para_list[4].ChangeValue(setup_dict['para_list'][4])
+            self.fit.para_list[5].ChangeValue(setup_dict['para_list'][5])
         else:
             self.fit.para_list[0].ChangeValue('0')
             self.fit.para_list[1].ChangeValue('0')
             self.fit.para_list[2].ChangeValue('0')
             self.fit.para_list[3].ChangeValue('0')
             self.fit.para_list[4].ChangeValue('0')
+            self.fit.para_list[5].ChangeValue('0')
 
         if setup_dict.has_key('fit_result'):
             self.fit.fit_result.ChangeValue(setup_dict['fit_result'])
@@ -808,32 +811,38 @@ class ControlPanel(wx.Panel):
     def evt_para_list_0_change(self, event):
         setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
         if setup_dict.has_key('para_list') == False:
-            setup_dict['para_list'] = [ 0 for i in xrange(5)]
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
         setup_dict['para_list'][0] = self.fit.para_list[0].GetValue()
 
     def evt_para_list_1_change(self, event):
         setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
         if setup_dict.has_key('para_list') == False:
-            setup_dict['para_list'] = [ 0 for i in xrange(5)]
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
         setup_dict['para_list'][1] = self.fit.para_list[1].GetValue()
 
     def evt_para_list_2_change(self, event):
         setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
         if setup_dict.has_key('para_list') == False:
-            setup_dict['para_list'] = [ 0 for i in xrange(5)]
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
         setup_dict['para_list'][2] = self.fit.para_list[2].GetValue()
 
     def evt_para_list_3_change(self, event):
         setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
         if setup_dict.has_key('para_list') == False:
-            setup_dict['para_list'] = [ 0 for i in xrange(5)]
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
         setup_dict['para_list'][3] = self.fit.para_list[3].GetValue()
 
     def evt_para_list_4_change(self, event):
         setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
         if setup_dict.has_key('para_list') == False:
-            setup_dict['para_list'] = [ 0 for i in xrange(5)]
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
         setup_dict['para_list'][4] = self.fit.para_list[4].GetValue()
+
+    def evt_para_list_5_change(self, event):
+        setup_dict = self.data_sets_list[self.current_row][self.current_column][self.current_data_set].setup_dict
+        if setup_dict.has_key('para_list') == False:
+            setup_dict['para_list'] = [ 0 for i in xrange(6)]
+        setup_dict['para_list'][5] = self.fit.para_list[5].GetValue()
 
 
 class data_setup():
@@ -1022,13 +1031,13 @@ class Fit(wx.Panel):
         
         vbox3 = wx.BoxSizer(wx.VERTICAL)
         self.para_list = []
-        for i in xrange(5):
+        for i in xrange(6):
             text = wx.TextCtrl(self, size = (70, 30))
             self.para_list.append(text)
             vbox3.Add(text)
         
 #        self.para_list[2].SetValue('abc')
-        self.fit_result = wx.TextCtrl(self, size = (250, 150), style = wx.TE_READONLY | wx.TE_MULTILINE)
+        self.fit_result = wx.TextCtrl(self, size = (250, 180), style = wx.TE_READONLY | wx.TE_MULTILINE)
 
         hbox4 = wx.BoxSizer(wx.HORIZONTAL)
         hbox4.Add(vbox3)
