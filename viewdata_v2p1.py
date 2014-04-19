@@ -7,6 +7,7 @@ from configobj import ConfigObj
 import matplotlib
 matplotlib.use('WXAgg')
 from matplotlib.figure import Figure
+import matplotlib.gridspec as gridspec
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigCanvas
 from matplotlib.backends.backend_wx import NavigationToolbar2Wx
 
@@ -22,9 +23,12 @@ import statdat
 
 data_dir = '/home/xinxing/Programs/data'
 new_setting_dir = './new_setting.INI'
+gs_resolution = 720
 
 #'''This dictionary define the types and default values for the elements in dictionary Curve_Setup_Dic.dic. Each word has a formate of : element_name:[type_string, default_value_string]. Dictionary Curve_Setup_Dic has and only has these elements in this dictionary'''
-Curve_setup_dict_type_default = {'name':['string','new curve'],'plotcurveB':['bool',False],'location':['int_list',[1,1]],'date':['string','2014/03/03'],'shots':['string','8163:8196'],'X':['string','SEQ:shot'],'Y':['string','MOT:goal'],'Xl':['string',''],'Xmin':['float',None],'Xmax':['float',None],'Yl':['string',''],'Ymin':['float',None],'Ymax':['float',None],'Legend':['string',''],'color':['string','black'],'ec':['string','black'],'fmt':['string','o'],'ms':['float',None],'mew':['float',None],'matchB':['bool',True],'statsB':['bool',False],'gridB':['bool',False],'logxB':['bool',False],'logyB':['bool',False],'xticksB':['bool',True],'yticksB':['bool',True],'plotfuncB':['bool',False],'fitB':['bool',False],'func':['string','Parabola'],'para_list':['float_list',[0,0,0,0,0,0]],'fit_result':['string',''], 'data_str':['string','']}
+Curve_setup_dict_type_default = {'name':['string','new curve'],'plotcurveB':['bool',False],'location':['int_list',[1,1]],'date':['string','2014/03/03'],'shots':['string','8163:8196'],'X':['string','SEQ:shot'],'Y':['string','MOT:goal'],'Xl':['string',''],'Xmin':['float',None],'Xmax':['float',None],'Yl':['string',''],'Ymin':['float',None],'Ymax':['float',None],'Legend':['string',''],'color':['string','black'],'ec':['string','black'],'fmt':['string','o'],'ms':['float',None],'mew':['float',None],'matchB':['bool',True],'statsB':['bool',False],'gridB':['bool',False],'logxB':['bool',False],'logyB':['bool',False],'xticksB':['bool',True],'yticksB':['bool',True],'plotfuncB':['bool',False],'fitB':['bool',False],'func':['string','Parabola'],'para_list':['float_list',[0,0,0,0,0,0]],'fit_result':['string',''], 'data_str':['string',''], 'curve_num':['int_list',[1,1]]}
+
+Subplot_setup_dict_type_default = {'name':['string','new subplot'],'location':['int_list',[1,1]],'plotsubB':['bool', False], 'curvelist':['curve_list',[]], 'subplot_num':['int_list',[1,1]]}
 
 
 class Curve():
@@ -146,7 +150,73 @@ class Curve():
                 print "Warning: element %s is not set!" %elem
     
 
-Subplot_setup_dict_type_default = {'name':['string','new subplot'],'location':['int_list',[1,1]],'plotsubB':['bool', False], 'curvelist':['curve_list',[]]}
+    def get_data(self):
+        directory = self.get_dir()
+        shots = self.dic['shots']
+        shots.replace(' ', '')  #remove all the spaces
+#        keys = " ".join([self.dic['X'], self.dic['Y']])
+#        self.data, errmsg, raw_data = qrange.qrange(directory, shots, keys)
+        keys = [self.dic['X'], self.dic['Y']]
+        self.data, errmsg, raw_data = qrange.qrange_eval(directory, shots, keys)
+        s = ''
+        for i in range(self.data.shape[1]):
+            col = self.data[:,i]
+            s00 = numpy.mean(col)
+            s01 = stats.sem(col)
+            s02 = numpy.std(col)
+            s03 = numpy.max(col) - numpy.min(col)
+            s = s + "Mean = %10.6f\n" % s00
+            s = s + "Std. deviation  = %10.6f\n" % s02
+            s = s + "Std. Error of the mean = %10.6f\n" % s01
+            s = s + "Pk-Pk = %10.6f\n" % s03
+            s = s+ '\n'
+        raw_data = s + raw_data
+        self.dic['data_str'] = raw_data
+
+        self.sdata = None
+        if self.dic['X'] == "SEQ:shot":
+            s = [ numpy.mean(self.data[:,1]), numpy.std(self.data[:,1]), stats.sem(self.data[:,1]),numpy.max(self.data[:,1]) - numpy.min(self.data[:,1]) ]
+            a = []
+            for val in s:
+                a.append( [val for i in range(self.data[:,1].size)])
+            self.sdata = numpy.c_[self.data[:,0], numpy.transpose(numpy.array(a))]
+        else:
+            self.sdata = statdat.statdat(self.data, 0, 1)
+        return
+
+    def get_dir(self):
+        year, month, day = self.dic['date'].split('/')
+        year2 = year[2:4]
+        return data_dir + '/' + year + '/' + year2+month + '/' + year2+month+day + '/' 
+
+    def get_plot_func(self):
+        func_name = self.dic['func']
+        function = fitdict[func_name].function
+        p = [ float(f) for f in self.dic['para_list']]
+        data = numpy.array(self.data)
+        self.plotX, self.plotY = plot_function(p, data[:,0], function)
+
+    def get_fit(self):
+        func_name = self.dic['func']
+        function = fitdict[func_name].function
+        p = [ float(f) for f in self.dic['para_list']]
+        data = numpy.array(self.data)
+        self.para_list_fit, self.error_list_fit = fit_function(p, data, function)
+        self.fitX, self.fitY = plot_function(self.para_list_fit, data[:,0], function)
+        self.fit_result_string = 'para' + '\t\t\t' + 'error' + '\n'
+        for i, para in enumerate(self.para_list_fit):
+            self.fit_result_string = self.fit_result_string + "{0:.2e}".format(para) + '\t' + "{0:.2e}".format(self.error_list_fit[i]) + '\n'
+        self.dic['fit_result'] = self.fit_result_string
+        return
+
+    def get_location(self, M_cur, N_cur, start, end):
+        '''get the location in the plot panel, in unit of grid spec pixels'''
+        m, n = self.dic['location']
+        m_res, n_res = [end[0] - start[0], end[1] - start[1]]
+        self.start = [start[0] + int(float(m - 1)/M_cur*m_res), start[1] + int(float(n-1)/N_cur*n_res)]
+        self.end =  [start[0] + int(float(m)/M_cur*m_res), start[1] + int(float(n)/N_cur*n_res)]
+#        print M_cur, N_cur, self.start, self.end
+
 
 
 class Subplot():
@@ -295,11 +365,38 @@ class Subplot():
                 self.set_value(elem, str_dic[elem])
             else:
                 print "Warning: element %s is not set!" %elem
+
     def get_name_list(self):
         name_list = []
         for curve in self.dic['curvelist']:
             name_list.append(curve.dic['name'])
         return name_list
+
+    def get_stat(self):
+        M_cur = 1
+        N_cur = 1
+        for curve in self.dic['curvelist']:
+            if curve.dic['plotcurveB']:
+                location_cur = curve.dic['location']
+                if location_cur[0] > M_cur:
+                    M_cur = location_cur[0]
+                if location_cur[1] > N_cur:
+                    N_cur = location_cur[1]
+        self.M_cur = M_cur
+        self.N_cur = N_cur
+        for curve in self.dic['curvelist']:
+            curve.set_value('curve_num', [self.M_cur, self.N_cur])
+
+    def get_location(self, M_sp, N_sp):
+        '''get the location in the plot panel, in unit of grid spec pixels'''
+        global gs_resolution    #resolutin of grid spec
+        m, n = self.dic['location']
+        self.start = [int(float(m - 1)/M_sp*gs_resolution), int(float(n-1)/N_sp*gs_resolution)]
+        self.end = [int(float(m)/M_sp*gs_resolution), int(float(n)/N_sp*gs_resolution)]
+        self.get_stat()
+        for curve in self.dic['curvelist']:
+            if curve.dic['plotcurveB']:
+                curve.get_location(self.M_cur, self.N_cur, self.start, self.end)
 
 
 class Subplot_List():
@@ -336,7 +433,7 @@ class Subplot_List():
         self.lst = []
         self.config = ConfigObj(self.current_file_dir)
         for elem in self.config:
-            subplot0 = Subplot()
+            subplot0 = copy.deepcopy(Subplot())
             subplot0.set_str_dic(self.config[elem])
             self.lst.append(subplot0)
 
@@ -350,6 +447,55 @@ class Subplot_List():
             self.config[('subplot %d' %i)] = subplot.get_str_dic()
         self.config.write()
 
+    def get_stat(self):
+        '''get the number of rows and collumns for subplots'''
+        M_sp = 1
+        N_sp = 1
+        for subplot in self.lst:
+            if subplot.dic['plotsubB']:
+                location_sp = subplot.dic['location']
+                if location_sp[0] > M_sp:
+                    M_sp = location_sp[0]
+                if location_sp[1] > N_sp:
+                    N_sp = location_sp[1]
+        self.M_sp = M_sp
+        self.N_sp = N_sp
+        for subplot in self.lst:
+            subplot.set_value('subplot_num', [self.M_sp, self.N_sp])
+
+    def get_locations(self):
+        '''get the locations for each subplot in the plot panel, in unit of grid spec pixels'''
+        self.get_stat()
+        for subplot in self.lst:
+            if subplot.dic['plotsubB']:
+                subplot.get_location(self.M_sp, self.N_sp)
+
+
+    def get_figures(self):
+        '''self.figures is a list containing all curves that will be shown. self.figures = [[curve1],[curve2, curve3]...], where curve2 and curve3 are two curves in the same figure.'''
+        self.get_locations()
+
+        self.figures = []
+        for subplot in self.lst:
+            if subplot.dic['plotsubB']:
+                for curve in subplot.dic['curvelist']:
+                    if curve.dic['plotcurveB']:
+                        same_figure = False
+                        if len(self.figures) > 0:
+                            for figure0 in  self.figures:
+                                curve0 = figure0[0]
+                                if curve.start == curve0.start:
+                                    figure0.append(curve)
+                                    same_figure = True
+                        if same_figure == False:
+                            self.figures.append([curve])
+
+#        if len(self.figures) > 0:
+#            for figure in self.figures:
+#                for curve in figure:
+#                    print curve.dic['name'], curve.start, curve.end
+        return self.figures
+
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
@@ -361,9 +507,9 @@ class MainWindow(wx.Frame):
 #        self.plotpanel.SetBackgroundColour('blue')
         self.controlpanel = ControlPanel(self.mainpanel)
 #        self.controlpanel.SetBackgroundColour('red')
-#       
+        
         self.replot = wx.Button(self.mainpanel, label = 'replot')
-#        self.Bind(wx.EVT_BUTTON, self.evt_press_replot, self.replot)
+        self.Bind(wx.EVT_BUTTON, self.evt_press_replot, self.replot)
         
         self.vSizer = wx.BoxSizer(wx.VERTICAL)
         self.vSizer.Add(self.replot, 0, wx.EXPAND | wx.ALL, 5)
@@ -378,99 +524,108 @@ class MainWindow(wx.Frame):
         self.Center()
         self.Show(True)
     
-#    def evt_press_replot(self, event):
-#        row_num = self.controlpanel.row_num
-#        column_num = self.controlpanel.column_num
-#        data_sets_list = self.controlpanel.data_sets_list
-#
-##        self.plotpanel.add_subplot()
-#        k = 0
-#        self.plotpanel.axes = []
-#        self.plotpanel.fig.clf()
-#        for i in xrange(row_num):
-#            for j in xrange(column_num):
-#                if len(data_sets_list[i][j]) > 0:
-#                    axes = self.plotpanel.fig.add_subplot(row_num, column_num, k+1)
-#                    self.plotpanel.axes.append(axes)
-#                    legend_tuple = ()
-#                    for l, data_set in enumerate(data_sets_list[i][j]):
-#                        data_set.get_data()
-#                        if len(data_set.data) > 0:
-#                            color = data_set.setup_dict['color'] if data_set.setup_dict['color'] != '' else 'black'
-#                            ec = data_set.setup_dict['ec'] if (data_set.setup_dict['ec'] != '')&(data_set.setup_dict['matchB'] == 'False') else color
-#                            fmt = data_set.setup_dict['fmt'] if data_set.setup_dict['fmt'] != '' else 'o'
-#                            ms = float(data_set.setup_dict['ms']) if data_set.setup_dict['ms'] != '' else 6.0
-#                            mew = float(data_set.setup_dict['mew']) if data_set.setup_dict['mew'] != '' else 1.0
-#                            
-#                            Legend = data_set.setup_dict['Legend'] if data_set.setup_dict['Legend'] != '' else 'NoLegend'
-#
-#                            stats = (data_set.setup_dict['statsB'] == 'True') if data_set.setup_dict.has_key('statsB') else False
-#                            
-#                            if data_set.sdata != None and stats:
-#                                sdata = data_set.sdata
-#                                sdata = sdata[sdata[:,0].argsort()]
-#                                axes.plot(sdata[:,0], sdata[:,1], '-', color = color)
-#                                axes.fill_between(sdata[:,0], sdata[:,1] + sdata[:,2], sdata[:,1] - sdata[:,2], facecolor = color, alpha = 0.3)
-#                                axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,3], sdata[:,1] -sdata[:,3], facecolor = color, alpha = 0.3)
-#                                axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,4]/2., sdata[:,1]-sdata[:,4]/2., facecolor = color, alpha = 0.1)
-#                            else:
-#                                axes.plot(data_set.data[:,0], data_set.data[:,1], fmt, mec = ec, mfc = color, ms = ms, mew =mew )
-#                            
-#                            legend_tuple = legend_tuple + (Legend,)
-#
-#                            if data_set.setup_dict['plotB'] == 'True':
-#                                if data_set.setup_dict['fitB'] == 'True':
-#                                    data_set.get_fit()
-#                                    axes.plot(data_set.fitX, data_set.fitY)
-#                                    self.controlpanel.fit.fit_result.ChangeValue(data_set.setup_dict['fit_result'])
-#                                    legend_tuple = legend_tuple + (Legend+'_fit',)
-#
-#                                else:
-#                                    data_set.get_plot()
-#                                    axes.plot(data_set.plotX, data_set.plotY)
-#                                    legend_tuple = legend_tuple + (Legend+'_plot',)
-#
-#                            if l == 0:
-#                                Xl = data_set.setup_dict['Xl'] if data_set.setup_dict['Xl'] != '' else data_set.setup_dict['X']
-#                                Yl = data_set.setup_dict['Yl'] if data_set.setup_dict['Yl'] != '' else data_set.setup_dict['Y']
-#                                grid = (data_set.setup_dict['gridB'] == 'True') if data_set.setup_dict.has_key('gridB') else False
-#                                Xmin = float(data_set.setup_dict['Xmin']) if data_set.setup_dict['Xmin'] != '' else 'nan'
-#                                Ymin = float(data_set.setup_dict['Ymin']) if data_set.setup_dict['Ymin'] != '' else 'nan'
-#                                Xmax = float(data_set.setup_dict['Xmax']) if data_set.setup_dict['Xmax'] != '' else 'nan'
-#                                Ymax = float(data_set.setup_dict['Ymax']) if data_set.setup_dict['Ymax'] != '' else 'nan'
-#                                logx = (data_set.setup_dict['logxB'] == 'True') if data_set.setup_dict.has_key('logxB') else False
-#                                logy = (data_set.setup_dict['logyB'] == 'True') if data_set.setup_dict.has_key('logyB') else False
-#                                xticks = (data_set.setup_dict['xticksB'] == 'True') if data_set.setup_dict.has_key('xticksB') else True
-#                                yticks = (data_set.setup_dict['yticksB'] == 'True') if data_set.setup_dict.has_key('yticksB') else True
-#
-#                                axes.set_xlabel(Xl)
-#                                axes.set_ylabel(Yl)
-#                                axes.grid(grid)
-#                                
-#                                if xticks == False:
-#                                    axes.set_xticks([])
-#
-#                                if yticks == False:
-#                                    axes.set_yticks([])
-#
-#                                if logx:
-#                                    axes.set_xscale('log')
-#                                
-#                                if logy:
-#                                    axes.set_yscale('log')
-#                                
-#                                if (Xmin != 'nan') & (Xmax != 'nan'):
-#                                    axes.set_xlim(Xmin, Xmax)
-#
-#                                if (Ymin != 'nan') & (Ymax != 'nan'):
-#                                    axes.set_ylim(Ymin, Ymax)
-#
-#                    if legend_tuple != ():
-#                        axes.legend(legend_tuple)
-#                k = k+1
-#        self.plotpanel.canvas.draw()
-#
-#        self.controlpanel.update_raw_data()
+    def evt_press_replot(self, event):
+        global gs_resolution
+        gs_sep = gs_resolution / 10
+        figures = self.controlpanel.subplot_list.get_figures()
+        
+        self.plotpanel.axes = []
+        self.plotpanel.fig.clf()
+        gs = gridspec.GridSpec(gs_resolution,gs_resolution)
+#see link: http://matplotlib.org/users/gridspec.html?highlight=subplot2grid for improvement.
+        gs.update(left = 0.02, right = 0.98, top =0.98, bottom = 0.02)
+
+        #save before ploting
+        self.controlpanel.subplot_list.save()
+
+        for figure in figures:
+            start = figure[0].start
+            end = figure[0].end
+#            axes = self.plotpanel.fig.add_subplot(gs[start[0]:end[0],start[1]:end[1]])
+            axes = self.plotpanel.fig.add_subplot(gs[start[0]+gs_sep/2:end[0]-gs_sep/2,start[1]+gs_sep/2:end[1]-gs_sep/2])
+            legend_tuple = []
+            line_tuple = []
+            for index_curve, curve in enumerate(figure):
+                self.plotpanel.axes.append(axes)
+                curve.get_data()
+                if len(curve.data) > 0:
+                    for elem in Curve_setup_dict_type_default:
+                        read_code = '%s = curve.dic["%s"]' %(elem, elem)
+                        exec read_code
+                    if matchB:
+                        ec = color
+                    if Xl =='':
+                        Xl = X
+                    if Yl =='':
+                        Xl = Y
+                    legendB = False if Legend == '' else True
+#                    print name, start, end, index_curve
+                    if curve.sdata != None and statsB:
+                        sdata = curve.sdata
+                        sdata = sdata[sdata[:,0].argsort()]
+                        line1, = axes.plot(sdata[:,0], sdata[:,1], '-', color = color)
+                        axes.fill_between(sdata[:,0], sdata[:,1] + sdata[:,2], sdata[:,1] - sdata[:,2], facecolor = color, alpha = 0.3)
+                        axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,3], sdata[:,1] -sdata[:,3], facecolor = color, alpha = 0.3)
+                        axes.fill_between(sdata[:,0], sdata[:,1] +sdata[:,4]/2., sdata[:,1]-sdata[:,4]/2., facecolor = color, alpha = 0.1)
+                    else:
+                        ms_code = ''
+                        if ms != None:
+                            ms_code = ', ms = ms'
+                        mew_code = ''
+                        if mew != None:
+                            mew_code = ', mew = mew'
+
+                        plot_code = 'line1, = axes.plot(curve.data[:,0], curve.data[:,1], fmt, mec = ec, mfc = color %s %s )' %(ms_code, mew_code)
+                        exec plot_code
+                    
+                    if plotfuncB:
+                        if fitB:
+                            curve.get_fit()
+                            line2, = axes.plot(curve.fitX, curve.fitY)
+                            Legend2 = Legend+'_fit'
+
+                        else:
+                            curve.get_plot_func()
+                            line2, =axes.plot(curve.plotX, curve.plotY)
+                            Legend2 = Legend+'_plot'
+                    
+                    if index_curve == 0:
+                        axes.set_xlabel(Xl)
+                        axes.set_ylabel(Yl)
+                        axes.grid(gridB)
+                        
+                        if xticksB == False:
+                            axes.set_xticks([])
+
+                        if yticksB == False:
+                            axes.set_yticks([])
+
+                        if logxB:
+                            axes.set_xscale('log')
+                        
+                        if logyB:
+                            axes.set_yscale('log')
+                        
+                        if (Xmin == None) & (Xmax == None) & (Ymin == None) & (Ymax == None):
+                            axes.autoscale(True)
+                        else:
+                            axes.set_xlim(Xmin, Xmax)
+                            axes.set_ylim(Ymin, Ymax)
+
+                if legendB:
+                    line_tuple.append(line1)
+                    legend_tuple.append(Legend)
+                    if plotfuncB:
+                        line_tuple.append(line2)
+                        legend_tuple.append(Legend2)
+
+            if legend_tuple != []:
+                axes.legend(line_tuple, legend_tuple,loc = 'best')
+
+#        gs.tight_layout(self.plotpanel.fig)
+
+        self.plotpanel.canvas.draw()
+        self.controlpanel.refresh_all(self.controlpanel.current_subplot,self.controlpanel.current_curve)
 
 class PlotPanel(wx.Panel):
     def __init__(self, parent):
@@ -509,10 +664,10 @@ class ControlPanel(wx.Panel):
         self.current_curve = 0
 
         #add/delete curve to a subplot
-        self.add_curve = wx.Button(self, label = 'Add Curve')
+        self.add_curve = wx.Button(self, label = 'Add Setup')
         self.Bind(wx.EVT_BUTTON, self.evt_press_add_curve, self.add_curve)
 
-        self.delete_curve = wx.Button(self, label = 'Del Curve')
+        self.delete_curve = wx.Button(self, label = 'Del Setup')
         self.Bind(wx.EVT_BUTTON, self.evt_press_delete_curve, self.delete_curve)
         
         #add/delete subplot
@@ -523,10 +678,10 @@ class ControlPanel(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.evt_press_delete_subplot, self.delete_subplot)
 
         #listboxes to choose curve or subplot
-        self.choose_curve = wx.ListBox(self, size = (150,40), choices = self.subplot_list.lst[self.current_subplot].get_name_list(), style = wx.LB_SINGLE)
+        self.choose_curve = wx.ListBox(self, size = (150,40), choices = [], style = wx.LB_SINGLE)
         self.Bind(wx.EVT_LISTBOX, self.evt_choose_curve, self.choose_curve)
 
-        self.choose_subplot = wx.ListBox(self, size = (150,100), choices = self.subplot_list.get_name_list(), style = wx.LB_SINGLE)
+        self.choose_subplot = wx.ListBox(self, size = (150,100), choices = [], style = wx.LB_SINGLE)
         self.Bind(wx.EVT_LISTBOX,self.evt_choose_subplot, self.choose_subplot)
 
         #setup of a subplot
@@ -534,7 +689,9 @@ class ControlPanel(wx.Panel):
         self.tex_name = wx.StaticText(self, label = "Name:")
         self.name = wx.TextCtrl(self, size = (130,30))
         self.tex_location = wx.StaticText(self, label = "Location:")
-        self.location = wx.TextCtrl(self, size = (70,30))
+        self.location = wx.TextCtrl(self, size = (40,30))
+        self.tex_subplot_num = wx.StaticText(self, label = "/")
+        self.subplot_num = wx.TextCtrl(self, size = (40,30))
         
         #setup of a curve
         self.nb = wx.Notebook(self, size = (450,300))
@@ -546,7 +703,7 @@ class ControlPanel(wx.Panel):
         for elem in Subplot_setup_dict_type_default:
             bind_code = ''
             elem_type = Subplot_setup_dict_type_default[elem][0]
-            if elem_type != 'curve_list':
+            if (elem_type != 'curve_list') & (elem != 'subplot_num'):
                 if elem_type == 'bool':
                     event_string = 'EVT_CHECKBOX'
                 elif (elem_type == 'string') | (elem_type == 'float') |(elem_type == 'int_list'):
@@ -557,7 +714,7 @@ class ControlPanel(wx.Panel):
         for elem in Curve_setup_dict_type_default:
             bind_code = ''
             elem_type = Curve_setup_dict_type_default[elem][0]
-            if (elem != 'fit_result') & (elem != 'data_str'):
+            if (elem != 'fit_result') & (elem != 'data_str') & (elem != 'curve_num'):
                 if elem_type == 'float_list':
                     event_string = 'EVT_TEXT'
                     bind_code = ''
@@ -593,12 +750,14 @@ class ControlPanel(wx.Panel):
 
         hSizer3 = wx.BoxSizer(wx.HORIZONTAL)
         hSizer3.Add(self.plotsubB)
-        hSizer3.AddSpacer(30)
+        hSizer3.AddSpacer(20)
         hSizer3.Add(self.tex_name)
         hSizer3.Add(self.name )
-        hSizer3.AddSpacer(30)
+        hSizer3.AddSpacer(20)
         hSizer3.Add(self.tex_location)
         hSizer3.Add(self.location)
+        hSizer3.Add(self.tex_subplot_num)
+        hSizer3.Add(self.subplot_num)
 
         self.ln = wx.StaticLine(self, -1, size = (450,15), style = wx.LI_HORIZONTAL)
         mainSizer = wx.BoxSizer(wx.VERTICAL)
@@ -608,7 +767,8 @@ class ControlPanel(wx.Panel):
         mainSizer.Add(self.ln)
         mainSizer.Add(self.nb, 1, flag = wx.ALIGN_RIGHT, border = 0)
         self.SetSizer(mainSizer)
-
+        
+        self.refresh_all(0,0)
     
     def refresh_curve_listbox(self):
         choices = self.subplot_list.lst[self.current_subplot].get_name_list()
@@ -658,11 +818,8 @@ class ControlPanel(wx.Panel):
             elif elem_type == 'bool':
                 refresh_code = 'self.%s.SetValue(dic["%s"])' %(elem,elem)
             elif elem_type == 'int_list':
-                if elem == 'location':
-                    string = subplot.get_str(elem)
-                    refresh_code = 'self.%s.ChangeValue(string)' %elem
-                else:
-                    refresh_code = 'print "Error: no such element!"'
+                string = subplot.get_str(elem)
+                refresh_code = 'self.%s.ChangeValue(string)' %elem
             elif elem_type == 'curve_list':
                     refresh_code = 'pass'
             else:
@@ -686,11 +843,8 @@ class ControlPanel(wx.Panel):
             elif elem_type == 'bool':
                 refresh_code = 'self.setup.%s.SetValue(dic["%s"])' %(elem,elem)
             elif elem_type == 'int_list':
-                if elem == 'location':
-                    string = curve.get_str(elem)
-                    refresh_code = 'self.setup.%s.ChangeValue(string)' %elem
-                else:
-                    refresh_code = 'print "Error: no such element!"'
+                string = curve.get_str(elem)
+                refresh_code = 'self.setup.%s.ChangeValue(string)' %elem
             elif elem_type == 'float_list':
                 if elem == 'para_list':
                     string = curve.get_str(elem)
@@ -730,11 +884,12 @@ class ControlPanel(wx.Panel):
         else:
             new_dir = 0
         dlg.Destroy()
-
-        self.subplot_list.load(new_dir)
-        if len(self.subplot_list.lst) == 0:
-            self.subplot_list.add_subplot()
-        self.refresh_all(0,0)
+        
+        if new_dir != 0:
+            self.subplot_list.load(new_dir)
+            if len(self.subplot_list.lst) == 0:
+                self.subplot_list.add_subplot()
+            self.refresh_all(0,0)
 
     def evt_press_save_setup_as(self, event):
         dlg = wx.FileDialog(self, "Choose a file to save to:", style = wx.FD_SAVE)
@@ -811,9 +966,15 @@ class ControlPanel(wx.Panel):
 
     def evt_subplot_location_change(self, event):
         self.update_subplot_elem('location')
+        self.subplot_list.get_stat()
+        string = self.subplot_list.lst[self.current_subplot].get_str('subplot_num')
+        self.subplot_num.ChangeValue(string)
 
     def evt_subplot_plotsubB_change(self, event):
         self.update_subplot_elem('plotsubB')
+        self.subplot_list.get_stat()
+        string = self.subplot_list.lst[self.current_subplot].get_str('subplot_num')
+        self.subplot_num.ChangeValue(string)
 
     
     def evt_curve_name_change(self, event):
@@ -823,9 +984,15 @@ class ControlPanel(wx.Panel):
 
     def evt_curve_location_change(self, event):
         self.update_curve_elem('location')
+        self.subplot_list.lst[self.current_subplot].get_stat()
+        string = self.subplot_list.lst[self.current_subplot].dic['curvelist'][self.current_curve].get_str('curve_num')
+        self.setup.curve_num.ChangeValue(string)
 
     def evt_curve_plotcurveB_change(self, event):
         self.update_curve_elem('plotcurveB')
+        self.subplot_list.lst[self.current_subplot].get_stat()
+        string = self.subplot_list.lst[self.current_subplot].dic['curvelist'][self.current_curve].get_str('curve_num')
+        self.setup.curve_num.ChangeValue(string)
 
     def evt_curve_date_change(self, event):
         self.update_curve_elem('date')
@@ -927,78 +1094,17 @@ class ControlPanel(wx.Panel):
         self.update_curve_elem('para_list', 5)
 
 
-#class data_setup():
-#    def __init__(self, name, setup_dict):
-#        self.name = name
-#        self.setup_dict = copy.deepcopy(setup_dict)
-#        self.raw_data = ''
-#
-#    def get_data(self):
-#        directory = self.get_dir()
-#        shots = self.setup_dict['shots']
-#        if type(shots) == type([]):
-#            shots = ",".join(shots)
-#        keys = " ".join([self.setup_dict['X'], self.setup_dict['Y']])
-#        self.data, self.errmsg, self.raw_data = qrange.qrange(directory, shots, keys)
-#        s = ''
-#        for i in range(self.data.shape[1]):
-#            col = self.data[:,i]
-#            s00 = numpy.mean(col)
-#            s01 = stats.sem(col)
-#            s02 = numpy.std(col)
-#            s03 = numpy.max(col) - numpy.min(col)
-#            s = s + "Mean = %10.6f\n" % s00
-#            s = s + "Std. deviation  = %10.6f\n" % s02
-#            s = s + "Std. Error of the mean = %10.6f\n" % s01
-#            s = s + "Pk-Pk = %10.6f\n" % s03
-#            s = s+ '\n'
-#        self.raw_data = s + self.raw_data
-#
-#        self.sdata = None
-#        if self.setup_dict['X'] == "SEQ:shot":
-#            s = [ numpy.mean(self.data[:,1]), numpy.std(self.data[:,1]), stats.sem(self.data[:,1]),numpy.max(self.data[:,1]) - numpy.min(self.data[:,1]) ]
-#            a = []
-#            for val in s:
-#                a.append( [val for i in range(self.data[:,1].size)])
-#            self.sdata = numpy.c_[self.data[:,0], numpy.transpose(numpy.array(a))]
-#        else:
-#            self.sdata = statdat.statdat(self.data, 0, 1)
-#
-#    def get_dir(self):
-#        year, month, day = self.setup_dict['date'].split('/')
-#        year2 = year[2:4]
-#        return data_dir + '/' + year + '/' + year2+month + '/' + year2+month+day + '/' 
-#
-#    def get_plot(self):
-#        func_name = self.setup_dict['func']
-#        function = fitdict[func_name].function
-#        p = [ float(f) for f in self.setup_dict['para_list']]
-#        data = numpy.array(self.data)
-#        self.plotX, self.plotY = plot_function(p, data[:,0], function)
-#    
-#    def get_fit(self):
-#        func_name = self.setup_dict['func']
-#        function = fitdict[func_name].function
-#        p = [ float(f) for f in self.setup_dict['para_list']]
-#        data = numpy.array(self.data)
-#        self.para_list_fit, self.error_list_fit = fit_function(p, data, function)
-#        self.fitX, self.fitY = plot_function(self.para_list_fit, data[:,0], function)
-#        self.fit_result_string = 'para' + '\t\t\t' + 'error' + '\n'
-#        for i, para in enumerate(self.para_list_fit):
-#            self.fit_result_string = self.fit_result_string + "{0:.2e}".format(para) + '\t' + "{0:.2e}".format(self.error_list_fit[i]) + '\n'
-#        self.setup_dict['fit_result'] = self.fit_result_string
-#
-#
 class Curve_Setup(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
         
-#        self.scrollbar = wx.ScrollBar(self, style = wx.SB_VERTICAL)
         self.plotcurveB = wx.CheckBox(self, label = 'Plot?')
         self.tex_name = wx.StaticText(self, label = "Name:")
         self.name = wx.TextCtrl(self, size = (130,30))
         self.tex_location = wx.StaticText(self, label = "Location:")
-        self.location = wx.TextCtrl(self, size = (70,30))
+        self.location = wx.TextCtrl(self, size = (40,30))
+        self.tex_curve_num = wx.StaticText(self, label = "/")
+        self.curve_num = wx.TextCtrl(self, size = (40,30))
         
         hSizer0 = wx.BoxSizer(wx.HORIZONTAL)
         hSizer0.Add(self.plotcurveB)
@@ -1008,6 +1114,8 @@ class Curve_Setup(wx.Panel):
         hSizer0.AddSpacer(20)
         hSizer0.Add(self.tex_location)
         hSizer0.Add(self.location)
+        hSizer0.Add(self.tex_curve_num)
+        hSizer0.Add(self.curve_num)
         
         self.tex_date = wx.StaticText(self, label = "Date:")
         self.date = wx.TextCtrl(self, size = (150,30))
@@ -1030,20 +1138,15 @@ class Curve_Setup(wx.Panel):
         grid1.Add(self.X, pos = (2,1))
         grid1.Add(self.tex_Y, pos = (3,0))
         grid1.Add(self.Y, pos = (3,1))
-#        grid1.Add(self.tex_color, pos = (4,0))
-#        grid1.Add(self.color, pos = (4,1))
         
         
         grid0  = wx.FlexGridSizer(1, 6, 7, 15)
-#        self.x2B     =  wx.CheckBox(self, label="X2?")
-#        self.y2B     =  wx.CheckBox(self, label="Y2?")
         self.statsB  =  wx.CheckBox(self, label="stats")
         self.gridB   =  wx.CheckBox(self, label="grid")
         self.logxB   =  wx.CheckBox(self, label="logx")
         self.logyB   =  wx.CheckBox(self, label="logy")
         self.xticksB =  wx.CheckBox(self, label="xticks")
         self.yticksB =  wx.CheckBox(self, label="yticks")
-#        grid0.AddMany([(self.x2B), (self.y2B), (self.statsB), (self.gridB), (self.logxB), (self.logyB), (self.xticksB), (self.yticksB) ])
         grid0.AddMany([(self.statsB), (self.gridB), (self.logxB), (self.logyB), (self.xticksB), (self.yticksB) ])
        
        
