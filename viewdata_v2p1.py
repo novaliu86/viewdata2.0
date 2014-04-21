@@ -2,6 +2,7 @@
 #view data version 2.0
 
 import wx
+import wx.lib.scrolledpanel as scrolled
 from configobj import ConfigObj
 
 import matplotlib
@@ -209,14 +210,10 @@ class Curve():
         self.dic['fit_result'] = self.fit_result_string
         return
 
-    def get_location(self, M_cur, N_cur, start, end):
+    def get_location(self, gs):
         '''get the location in the plot panel, in unit of grid spec pixels'''
         m, n = self.dic['location']
-        m_res, n_res = [end[0] - start[0], end[1] - start[1]]
-        self.start = [start[0] + int(float(m - 1)/M_cur*m_res), start[1] + int(float(n-1)/N_cur*n_res)]
-        self.end =  [start[0] + int(float(m)/M_cur*m_res), start[1] + int(float(n)/N_cur*n_res)]
-#        print M_cur, N_cur, self.start, self.end
-
+        self.gs = gridspec.GridSpecFromSubplotSpec(1, 1, subplot_spec = gs[m-1,n-1])
 
 
 class Subplot():
@@ -387,16 +384,14 @@ class Subplot():
         for curve in self.dic['curvelist']:
             curve.set_value('curve_num', [self.M_cur, self.N_cur])
 
-    def get_location(self, M_sp, N_sp):
+    def get_location(self, gs):
         '''get the location in the plot panel, in unit of grid spec pixels'''
-        global gs_resolution    #resolutin of grid spec
         m, n = self.dic['location']
-        self.start = [int(float(m - 1)/M_sp*gs_resolution), int(float(n-1)/N_sp*gs_resolution)]
-        self.end = [int(float(m)/M_sp*gs_resolution), int(float(n)/N_sp*gs_resolution)]
         self.get_stat()
+        self.gs = gridspec.GridSpecFromSubplotSpec(self.M_cur, self.N_cur, subplot_spec = gs[m-1,n-1])
         for curve in self.dic['curvelist']:
             if curve.dic['plotcurveB']:
-                curve.get_location(self.M_cur, self.N_cur, self.start, self.end)
+                curve.get_location(self.gs)
 
 
 class Subplot_List():
@@ -466,9 +461,10 @@ class Subplot_List():
     def get_locations(self):
         '''get the locations for each subplot in the plot panel, in unit of grid spec pixels'''
         self.get_stat()
+        self.gs = gridspec.GridSpec(self.M_sp, self.N_sp)
         for subplot in self.lst:
             if subplot.dic['plotsubB']:
-                subplot.get_location(self.M_sp, self.N_sp)
+                subplot.get_location(self.gs)
 
 
     def get_figures(self):
@@ -484,7 +480,7 @@ class Subplot_List():
                         if len(self.figures) > 0:
                             for figure0 in  self.figures:
                                 curve0 = figure0[0]
-                                if curve.start == curve0.start:
+                                if curve.gs == curve0.gs:
                                     figure0.append(curve)
                                     same_figure = True
                         if same_figure == False:
@@ -525,28 +521,24 @@ class MainWindow(wx.Frame):
         self.Show(True)
     
     def evt_press_replot(self, event):
-        global gs_resolution
-        gs_sep = gs_resolution / 10
         figures = self.controlpanel.subplot_list.get_figures()
         
-        self.plotpanel.axes = []
+#        self.plotpanel.axes = []
         self.plotpanel.fig.clf()
-        gs = gridspec.GridSpec(gs_resolution,gs_resolution)
+#        gs = gridspec.GridSpec(gs_resolution,gs_resolution)
 #see link: http://matplotlib.org/users/gridspec.html?highlight=subplot2grid for improvement.
-        gs.update(left = 0.02, right = 0.98, top =0.98, bottom = 0.02)
+#        gs.update(left = 0.02, right = 0.98, top =0.98, bottom = 0.02)
 
         #save before ploting
         self.controlpanel.subplot_list.save()
 
         for figure in figures:
-            start = figure[0].start
-            end = figure[0].end
-#            axes = self.plotpanel.fig.add_subplot(gs[start[0]:end[0],start[1]:end[1]])
-            axes = self.plotpanel.fig.add_subplot(gs[start[0]+gs_sep/2:end[0]-gs_sep/2,start[1]+gs_sep/2:end[1]-gs_sep/2])
             legend_tuple = []
             line_tuple = []
+
+            axes = self.plotpanel.fig.add_subplot(figure[0].gs[0,0])
+            
             for index_curve, curve in enumerate(figure):
-                self.plotpanel.axes.append(axes)
                 curve.get_data()
                 if len(curve.data) > 0:
                     for elem in Curve_setup_dict_type_default:
@@ -1094,9 +1086,9 @@ class ControlPanel(wx.Panel):
         self.update_curve_elem('para_list', 5)
 
 
-class Curve_Setup(wx.Panel):
+class Curve_Setup(scrolled.ScrolledPanel):
     def __init__(self, parent):
-        wx.Panel.__init__(self, parent)
+        super(Curve_Setup, self).__init__(parent = parent, id = wx.ID_ANY)
         
         self.plotcurveB = wx.CheckBox(self, label = 'Plot?')
         self.tex_name = wx.StaticText(self, label = "Name:")
@@ -1256,6 +1248,7 @@ class Curve_Setup(wx.Panel):
         vbox.AddSpacer(10)
         vbox.Add(hbox4)
         self.SetSizerAndFit(vbox)
+        self.SetupScrolling()
 
 class Curve_Data(wx.Panel):
     def __init__(self, parent):
