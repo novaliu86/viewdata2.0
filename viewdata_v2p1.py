@@ -22,7 +22,7 @@ from fitlibrary import *
 import statdat
 
 
-data_dir = '/home/xinxing/Programs/data'
+data_dir = '/lab/data/app3'
 new_setting_dir = './new_setting.INI'
 gs_resolution = 720
 
@@ -158,7 +158,9 @@ class Curve():
 #        keys = " ".join([self.dic['X'], self.dic['Y']])
 #        self.data, errmsg, raw_data = qrange.qrange(directory, shots, keys)
         keys = [self.dic['X'], self.dic['Y']]
+#	print 'Before qrange.'
         self.data, errmsg, raw_data = qrange.qrange_eval(directory, shots, keys)
+#	print 'After qrange.'
         s = ''
         for i in range(self.data.shape[1]):
             col = self.data[:,i]
@@ -549,7 +551,7 @@ class MainWindow(wx.Frame):
                     if Xl =='':
                         Xl = X
                     if Yl =='':
-                        Xl = Y
+                        Yl = Y
                     legendB = False if Legend == '' else True
 #                    print name, start, end, index_curve
                     if curve.sdata != None and statsB:
@@ -1065,7 +1067,7 @@ class ControlPanel(wx.Panel):
         self.update_curve_elem('func')
         curve = self.subplot_list.lst[self.current_subplot].dic['curvelist'][self.current_curve]
         self.setup.function = fitdict[curve.dic['func']]
-        self.setup.tex_function.SetLabel('f(x) = ' + self.data_setup.function.fitexpr)
+        self.setup.tex_function.SetLabel('f(x) = ' + self.setup.function.fitexpr)
 
     def evt_curve_para_list_0_change(self, event):
         self.update_curve_elem('para_list', 0)
